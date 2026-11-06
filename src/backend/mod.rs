@@ -41,6 +41,9 @@ use crate::SEED_LENGTH;
 #[cfg(feature = "rustcrypto")]
 pub mod rustcrypto;
 
+#[cfg(feature = "host")]
+mod host;
+
 #[cfg(feature = "boringssl")]
 #[allow(unsafe_code)]
 pub mod boringssl;
@@ -100,7 +103,9 @@ pub trait Scalar:
 /// Points are not required to be `Copy`: the BoringSSL backend keeps a heap
 /// handle so that intermediate values, some of which depend on secrets, are
 /// never decompressed again. Scalar multiplication is constant time in the
-/// scalar. Addition is constant time in both operands except where the
+/// scalar, except that the opt-in `host` feature relies on the embedder and
+/// does not establish constant-time behavior across its runtime boundary.
+/// Addition is constant time in both operands except where the
 /// operands are equal or negatives of each other: BoringSSL's `EC_POINT_add`
 /// then takes a separate doubling or identity path. Where one operand
 /// depends on a uniformly random secret independent of the other operand,

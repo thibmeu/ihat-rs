@@ -90,6 +90,37 @@ constant-time decompression; the `boringssl` backend computes
 `(x^3 - 3x + b)^((p+1)/4)` with BoringSSL's constant-time Montgomery
 arithmetic and compares its square.
 
+### Host scalar multiplication
+
+The opt-in `host` feature routes RustCrypto scalar multiplication through
+`ihat_host_mul_generator` and `ihat_host_ecdh` imports on Wasm. Link
+[`tests/host/imports.js`](tests/host/imports.js) with Emscripten's
+`--js-library` and create `globalThis.__wcECDH` with
+`createECDH('prime256v1')` from `node:crypto` before instantiating the module.
+The imports must write 33-byte compressed points and 32-byte x-coordinates,
+respectively, and return zero on success. A host failure aborts the operation.
+On native targets, reference imports use `p256`, including when this crate is
+a dependency, so downstream host-feature tests can link and run.
+
+The Rust sign selection is constant time. The JavaScript/runtime boundary
+has not been established to be constant time and is outside the backend's
+constant-time guarantee. Scalars and ECDH outputs also enter host memory;
+Rust cannot wipe those copies or the key retained by the ECDH object.
+
+Run the full library test suite, including vectors and exceptional points,
+against workerd's actual imports (no mocks):
+
+```sh
+# Requires emcc (tested with Emscripten 6.0.10), Node.js and workerd on PATH.
+rustup target add wasm32-unknown-emscripten
+node scripts/test-host.mjs
+# The same runner supports downstream crates with a `host` feature:
+node scripts/test-host.mjs /path/to/act-rs
+```
+
+`WORKERD` can select a workerd binary (tested with 1.20261104.1).
+`cargo test --features host` instead uses the native reference imports.
+
 ### Building the BoringSSL backend
 
 `bssl-sys` is not published on crates.io (the registry entry is a
@@ -145,8 +176,9 @@ library in `p256` and `getrandom`, and the precomputed generator tables of
   `boringssl` backend, point addition takes a separate path when its operands
   are equal or negatives of each other, which for a uniformly random secret
   operand independent of the other happens with negligible probability.
-  Values that fail to decode are not wiped; their bytes remain the caller's
-  to wipe.
+  The opt-in `host` feature has the additional runtime and memory limits
+  described above. Values that fail to decode are not wiped; their bytes
+  remain the caller's to wipe.
 * `respond` consumes the Anchor's state, `finalize` the Client's, and
   `redeem` the Endorsement, so none is used twice within a process. An
   Anchor must also refuse a second challenge for a session it has answered,

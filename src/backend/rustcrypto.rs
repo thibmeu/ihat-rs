@@ -17,7 +17,7 @@
 use core::sync::atomic::{Ordering, compiler_fence};
 
 use p256::elliptic_curve::group::GroupEncoding;
-use p256::elliptic_curve::ops::{Double, LinearCombination};
+use p256::elliptic_curve::ops::Double;
 use p256::elliptic_curve::point::DecompressPoint;
 use p256::elliptic_curve::{Field, Group, PrimeField};
 use p256::hash2curve::{ExpandMsgXmd, hash_from_bytes};
@@ -81,16 +81,27 @@ impl super::Point for ProjectivePoint {
     }
 
     fn mul(&self, scalar: &Self::Scalar) -> Self {
-        self * scalar
+        #[cfg(feature = "host")]
+        return super::host::mul(self, scalar);
+        #[cfg(not(feature = "host"))]
+        return self * scalar;
     }
 
     fn mul_generator(scalar: &Self::Scalar) -> Self {
-        <Self as Group>::mul_by_generator(scalar)
+        #[cfg(feature = "host")]
+        return super::host::mul_generator(scalar);
+        #[cfg(not(feature = "host"))]
+        return <Self as Group>::mul_by_generator(scalar);
     }
 
+    // With `host`, the default sums host multiplications, which is faster in
+    // Wasm than this multi-scalar multiplication.
+    #[cfg(not(feature = "host"))]
     fn lincomb<const N: usize>(terms: [(&Self, &Self::Scalar); N]) -> Self {
         let terms = terms.map(|(point, scalar)| (*point, *scalar));
-        <Self as LinearCombination<[(Self, Self::Scalar); N]>>::lincomb(&terms)
+        <Self as p256::elliptic_curve::ops::LinearCombination<[(Self, Self::Scalar); N]>>::lincomb(
+            &terms,
+        )
     }
 
     fn ct_select<'a, I>(table: I, index: usize) -> CtOption<Self>

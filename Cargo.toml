@@ -25,6 +25,10 @@ std = ["p256?/std", "p256?/precomputed-tables", "getrandom?/std"]
 # Randomness from the JavaScript host on `wasm32-unknown-unknown`, for the
 # `rustcrypto` backend; other bare targets need a `getrandom` custom backend.
 wasm_js = ["getrandom?/wasm_js"]
+# The `rustcrypto` backend with scalar multiplication imported from the host
+# (`ihat_host_mul_generator`, `ihat_host_ecdh`), e.g. workerd's native P-256
+# under Wasm. See `src/backend/host.rs`.
+host = ["rustcrypto"]
 # BoringSSL backend over the `bssl-sys` FFI bindings. `bssl-sys` is not
 # published; patch it to a BoringSSL checkout (see README).
 boringssl = ["dep:bssl-sys"]
@@ -45,7 +49,7 @@ hex = "0.4"
 [package.metadata.docs.rs]
 features = ["rustcrypto"]
 
-[dev-dependencies.criterion]
+[target.'cfg(not(target_os = "emscripten"))'.dev-dependencies.criterion]
 version = "0.8"
 
 [[example]]

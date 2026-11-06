@@ -37,6 +37,8 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      - run: cargo test --features host
+      - run: cargo clippy --all-targets --features host -- -D warnings
       - run: cargo doc --no-deps
       - run: cargo run --example demo
 
